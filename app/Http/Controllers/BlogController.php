@@ -16,6 +16,13 @@ class BlogController extends Controller
         $user = Auth::user();
         $query = Blog::withCount('likes');
 
+        if ($user) {
+            $query->withExists([
+                'likes as liked_by_me' => function ($q) use ($user) {
+                    $q->where('user_id', $user->id);
+                }
+            ]);
+        }
 
         if ($request->has('search')) {
             $search = $request->input('search');
@@ -30,15 +37,16 @@ class BlogController extends Controller
             $query->orderByDesc('likes_count');
         } elseif ($request->filter === 'latest') {
             $query->orderByDesc('created_at');
-        }
+        } 
 
-        
         $blogs = $query->paginate(10);
 
-        $blogs->getCollection()->transform(function ($blog) use ($user) {
-            $blog->liked_by_me = $blog->likes->where('user_id', $user->id)->isNotEmpty();
-            return $blog;
-        });
+        if ($user) {
+            $blogs->getCollection()->transform(function ($blog) {
+                $blog->liked_by_me = (bool) $blog->liked_by_me;
+                return $blog;
+            });
+        }
 
         return response()->json($blogs);
     }
@@ -57,6 +65,7 @@ class BlogController extends Controller
             $path = $request->file('image')->store('uploads', 'public');
             $data['image'] = $path;
             $data['image_url'] = asset('storage/' . $path);
+            
         }
 
         $data['user_id'] = Auth::id();
@@ -64,6 +73,7 @@ class BlogController extends Controller
         $blog = Blog::create($data);
         return response()->json([
             'message' => 'Blog updated successfully.',
+
             'data' => $blog->fresh()->toArray() + ['image_url' => asset('storage/' . $blog->image)],
         ], 200);
     }
@@ -124,7 +134,7 @@ class BlogController extends Controller
     {
         $user = Auth::user();
 
-        $blog = Blog::findOrFail($id);
+        $blog = Blog::findOrFail($id);  
         $like = $blog->likes()->where('user_id', $user->id)->first();
 
         if ($like) {
