@@ -41,13 +41,6 @@ class BlogController extends Controller
 
         $blogs = $query->paginate(10);
 
-        if ($user) {
-            $blogs->getCollection()->transform(function ($blog) {
-                $blog->liked_by_me = (bool) $blog->liked_by_me;
-                return $blog;
-            });
-        }
-
         return response()->json($blogs);
     }
 
